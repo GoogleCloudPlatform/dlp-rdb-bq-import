@@ -1,0 +1,129 @@
+/* Copyright 2018 Google LLC
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
+
+buildscript {
+    ext {
+        dataflowBeamVersion = '2.9.0'
+    }
+    repositories {
+        mavenCentral()
+        jcenter()
+        maven {
+     		 url "https://plugins.gradle.org/m2/"
+    	}
+    	
+    }
+    dependencies {
+        classpath "net.ltgt.gradle:gradle-apt-plugin:0.19"
+        
+        
+    }
+}
+
+apply plugin: 'java'
+apply plugin: 'application'
+apply plugin: 'eclipse'
+apply plugin: 'idea'
+apply plugin: "net.ltgt.apt"
+
+
+//mainClassName = System.getProperty("mainClass")
+mainClassName = 'com.google.swarm.sqlserver.migration.DBImportPipeline'
+group 'com.google.swarm'
+version '0.1.0'
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+applicationDefaultJvmArgs = ['-Xms4g', '-Xmx16g']
+
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+}
+
+repositories {
+  
+   mavenCentral()
+
+}
+
+
+
+dependencies {
+   
+  
+    compile group: 'org.apache.beam', name: 'beam-sdks-java-core', version: dataflowBeamVersion
+    compile group: 'org.apache.beam', name: 'beam-runners-google-cloud-dataflow-java', version: dataflowBeamVersion
+    compile group: 'org.apache.beam', name: 'beam-runners-direct-java', version: dataflowBeamVersion
+	compile group: 'org.slf4j', name: 'slf4j-jdk14', version: '1.7.5'   
+	compile group: 'org.apache.beam', name: 'beam-sdks-java-io-jdbc', version: dataflowBeamVersion 
+	compile group: 'com.microsoft.sqlserver', name: 'mssql-jdbc', version: '7.0.0.jre8'
+	compile "com.google.auto.value:auto-value-annotations:1.6.2"
+    annotationProcessor "com.google.auto.value:auto-value:1.6.2"
+    compile 'com.google.cloud:google-cloud-storage:1.55.0'
+    compile 'com.google.cloud:google-cloud-dlp:0.74.0-beta'
+    compile group: 'org.json', name: 'json', version: '20180813'
+    
+	
+    compile('com.google.guava:guava:21.0'){
+        force = true
+    }
+    
+    compile ('com.google.api-client:google-api-client:1.23.0') {
+        force = true
+    }
+    
+
+	testCompile group: 'org.apache.beam', name: 'beam-runners-direct-java', version: dataflowBeamVersion
+	testCompile group: 'org.slf4j', name: 'slf4j-jdk14', version: '1.7.5'
+	testCompile 'junit:junit:4.12'
+	testCompile group: 'com.microsoft.sqlserver', name: 'mssql-jdbc', version: '7.0.0.jre8'
+	
+	
+}
+
+jar {
+    manifest {
+        attributes ('Main-Class': mainClassName)
+    }
+    
+}
+
+
+
+
+compileJava {
+    // Add additional jvm argument
+    options.compilerArgs.addAll(['-Xlint:all'])
+}
+
+// default tasks when you run ./gradlew
+defaultTasks 'clean', 'assemble'
+// Google cloud dataflow requires the resource/main directory to exist
+task resources {
+    def resourcesDir = new File('build/resources/main')
+    resourcesDir.mkdirs()
+}
+
+run {
+    if (project.hasProperty('args')) {
+        args project.args.split('\\s')
+    }
+}
+
+run.mustRunAfter 'resources'
+
+
