@@ -147,16 +147,16 @@ Run Using Direct Runner. Please replace arguments as required.
 gradle run -Pargs=" --project=sqlserver-gke-dataflow --runner=DirectRunner --dataSet=sql_servers_db_migration_test --JDBCSpec=jdbc:sqlserver://130.211.216.221:1433;DatabaseName=customer_db;user=sa;password=XXXX;encrypt=true;trustServerCertificate=true --tempLocation=gs://df_db_migration/temp --offsetCount=500 --DLPConfigBucket=dlp_config --DLPConfigObject=db1/dlpconfigs.json"
 ```
 
-### Run Pipline in DataFlow 
+### Run Pipeline in DataFlow 
 
-####Using gradle run
+#### Using gradle run
 
 ```
 gradle run -Pargs=" --project=sqlserver-gke-dataflow --runner=DataflowRunner --dataSet=sql_servers_db_migration --JDBCSpec=jdbc:sqlserver://130.211.216.221:1433;DatabaseName=customer_db;user=sa;password=XXXX;encrypt=true;trustServerCertificate=true --tempLocation=gs://df_db_migration/temp --offsetCount=500 --DLPConfigBucket=dlp_config --DLPConfigObject=db1/dlpconfigs.json"
 
 ```
 
-####Using dataflow template:
+#### Using dataflow template:
 
 ```
 Create the template: 
@@ -171,7 +171,7 @@ gcloud dataflow jobs run test-run --gcs-location gs://template-dbimport/sqlserve
 
 ### How the Dataflow pipeline works?
 
-This pipline executes in following steps:
+This pipeline executes in following steps:
 
 1. Create a inital PCollection using the JDBC Spec provided.   
 2. Query the schema table to create list of tables and list og columns for each table
@@ -180,7 +180,14 @@ This pipline executes in following steps:
 5. Use Dynamic destination feature in Big Query IO to create dataset and table schema as required. 
 6. Pipline uses Bigquery data load jobs (not streaming inserts) to load data.  
  
- 
+
+### Connecting to SQL Server with Active Directory Authentication 
+In order to connect to SQL Servers with Active Directory authentication enabled, we must utilise the opensource JTDS driver. The vendor supported JDBC driver does not support AD authetication within DataFlow.
+
+In order to authenticate using AD change your JDBC string as per the following example:
+```
+jdbc:jtds:sqlserver://1.2.3.4:1433;instance=test;user=svc.user;password='P@55word';useNTLMv2=true;domain=workgroup
+```
 
 
 ### DLP Template used in this example

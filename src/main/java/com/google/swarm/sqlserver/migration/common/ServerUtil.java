@@ -41,6 +41,8 @@ import com.google.common.collect.ImmutableMap;
 import com.google.gson.Gson;
 import com.google.privacy.dlp.v2.FieldId;
 
+import net.sourceforge.jtds.jdbc.*;
+
 public class ServerUtil {
 
 	public static final Logger LOG = LoggerFactory.getLogger(ServerUtil.class);
