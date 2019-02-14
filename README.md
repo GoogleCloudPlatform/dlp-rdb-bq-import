@@ -182,7 +182,7 @@ This pipeline executes in following steps:
  
 
 ### Connecting to SQL Server with Active Directory Authentication 
-In order to connect to SQL Servers with Active Directory authentication enabled, we must utilise the opensource JTDS driver. The vendor supported JDBC driver does not support AD authetication within DataFlow.
+In order to connect to SQL Servers with Active Directory authentication enabled, we must utilise the opensource JTDS driver. The vendor supported JDBC driver does not support AD authentication within DataFlow.
 
 In order to authenticate using AD change your JDBC string as per the following example:
 ```
