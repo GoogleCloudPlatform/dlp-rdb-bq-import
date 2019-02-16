@@ -30,7 +30,7 @@ public class TestUtil {
 	public final static String COLUMN1_TYPE = String.valueOf("VARCHAR");
 	public final static String COLUMN2_NAME = String.valueOf("AGE");
 	public final static String COLUMN2_TYPE = String.valueOf("INT");
-	public static final String TEMP_BUCKET = String.valueOf("test_db_import");
+	public static final String TEMP_BUCKET = String.valueOf("test_db_import_1");
 	public static String TEMP_LOCATION = null;
 
 	public final static List<SqlColumn> testColumns = new ArrayList<>();

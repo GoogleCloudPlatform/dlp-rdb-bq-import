@@ -15,4 +15,4 @@ include 'api'
 include 'services:webservice'
 */
 
-rootProject.name = 'swarm-canada-rdb-bq-import'
+rootProject.name = 'dlp-rdb-bq-import'

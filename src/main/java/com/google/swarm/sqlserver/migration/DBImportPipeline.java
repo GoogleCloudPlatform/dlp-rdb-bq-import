@@ -21,13 +21,22 @@ import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.coders.CoderProviders;
 import org.apache.beam.sdk.extensions.gcp.options.GcpOptions;
 import org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO;
+import org.apache.beam.sdk.io.gcp.bigquery.InsertRetryPolicy;
+import org.apache.beam.sdk.io.gcp.bigquery.WriteResult;
 import org.apache.beam.sdk.options.PipelineOptionsFactory;
 import org.apache.beam.sdk.options.ValueProvider;
 import org.apache.beam.sdk.transforms.Create;
+import org.apache.beam.sdk.transforms.DoFn;
+import org.apache.beam.sdk.transforms.MapElements;
 import org.apache.beam.sdk.transforms.ParDo;
 import org.apache.beam.sdk.transforms.SerializableFunction;
+import org.apache.beam.sdk.transforms.DoFn.ProcessContext;
+import org.apache.beam.sdk.transforms.windowing.AfterProcessingTime;
+import org.apache.beam.sdk.transforms.windowing.FixedWindows;
+import org.apache.beam.sdk.transforms.windowing.Window;
 import org.apache.beam.sdk.values.KV;
 import org.apache.beam.sdk.values.PCollection;
+import org.joda.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,11 +80,12 @@ public class DBImportPipeline {
 
 		PCollection<KV<SqlTable, TableRow>> dbRowKeyValue = tableCollection
 				.apply("Create DB Rows", ParDo.of(new TableToDbRowFn(options.getJDBCSpec(), options.getOffsetCount())))
-				.apply("DLP Tokenization",
-						ParDo.of(new DLPTokenizationDoFn(options.as(GcpOptions.class).getProject())))
-				.apply("Convert To BQ Row", ParDo.of(new BigQueryTableRowDoFn()));
-
-		dbRowKeyValue.apply("Write to BQ",
+				.apply("DLP Tokenization", ParDo.of(new DLPTokenizationDoFn(options.as(GcpOptions.class).getProject())))
+				.apply("Convert To BQ Row", ParDo.of(new BigQueryTableRowDoFn()))
+				.apply(Window.<KV<SqlTable, TableRow>>into(FixedWindows.of(Duration.standardSeconds(10)))
+						.triggering(AfterProcessingTime.pastFirstElementInPane().plusDelayOf(Duration.ZERO))
+						.discardingFiredPanes().withAllowedLateness(Duration.ZERO));
+		WriteResult writeResult = dbRowKeyValue.apply("Write to BQ",
 				BigQueryIO.<KV<SqlTable, TableRow>>write().to(new BigQueryTableDestination(options.getDataSet()))
 						.withFormatFunction(new SerializableFunction<KV<SqlTable, TableRow>, TableRow>() {
 
@@ -84,8 +94,20 @@ public class DBImportPipeline {
 								return kv.getValue();
 
 							}
-						}).withWriteDisposition(BigQueryIO.Write.WriteDisposition.WRITE_TRUNCATE)
-						.withCreateDisposition(BigQueryIO.Write.CreateDisposition.CREATE_IF_NEEDED));
+						}).withWriteDisposition(BigQueryIO.Write.WriteDisposition.WRITE_APPEND)
+						.withCreateDisposition(BigQueryIO.Write.CreateDisposition.CREATE_IF_NEEDED)
+						.withMethod(BigQueryIO.Write.Method.STREAMING_INSERTS)
+						.withFailedInsertRetryPolicy(InsertRetryPolicy.retryTransientErrors()));
+
+		writeResult.getFailedInserts().apply(ParDo.of(new DoFn<TableRow, TableRow>() {
+
+			@ProcessElement
+			public void processElement(ProcessContext c) {
+				LOG.error("***ERROR*** Failed Insert {}", c.element().toString());
+				c.output(c.element());
+			}
+
+		}));
 
 		p.run();
 	}

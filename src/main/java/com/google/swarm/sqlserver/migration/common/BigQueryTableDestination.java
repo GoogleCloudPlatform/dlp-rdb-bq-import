@@ -51,7 +51,7 @@ public class BigQueryTableDestination extends DynamicDestinations<KV<SqlTable, T
 
 	@Override
 	public TableDestination getTable(KV<String, SqlTable> value) {
-		LOG.info("Table Defination:{}", value.getKey());
+		LOG.debug("Table Defination:{}", value.getKey());
 		return new TableDestination(value.getKey(), "DB Import Table");
 	}
 
@@ -62,10 +62,11 @@ public class BigQueryTableDestination extends DynamicDestinations<KV<SqlTable, T
 		try {
 
 			tableSchema = ServerUtil.getBigQuerySchema(value.getValue().getCloumnList());
-			LOG.info("***Table Schema {}", tableSchema.toString());
+			LOG.debug("***Table Schema {}", tableSchema.toString());
 
 		} catch (SQLException e) {
-			e.printStackTrace();
+			LOG.error("***ERROR*** {} Unable to create dynamic schema", e.toString());
+			throw new RuntimeException(e);
 		}
 		return tableSchema;
 

@@ -41,8 +41,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.gson.Gson;
 import com.google.privacy.dlp.v2.FieldId;
 
-import net.sourceforge.jtds.jdbc.*;
-
 public class ServerUtil {
 
 	public static final Logger LOG = LoggerFactory.getLogger(ServerUtil.class);
@@ -67,26 +65,31 @@ public class ServerUtil {
 		Connection connection = null;
 
 		try {
-
+			/*
+			 * Currently from any JDBC 4.0 drivers that are found in the class path are
+			 * automatically loaded. So, there is no need for Class.forName(). SQL Server
+			 * JDBC and JTDS Drivers are par of build.gradle at this time and included in
+			 * runtime. Please add required drivers if you need support for additional
+			 * databases.
+			 */
 			connection = DriverManager.getConnection(connectionUrl);
 			LOG.debug("Connection Status: " + connection.isClosed());
 
 		} catch (Exception e) {
-			e.printStackTrace();
+			LOG.error("***ERROR*** Unable to create connection {}", e.toString());
+			throw new RuntimeException(e);
 		}
 
 		return connection;
 
 	}
 
-	public static List<SqlTable> getTablesList(Connection connection, List<DLPProperties> dlpConfigList)
-			throws SQLException {
+	public static List<SqlTable> getTablesList(Connection connection, List<DLPProperties> dlpConfigList) {
 		List<SqlTable> tables = new ArrayList<SqlTable>();
 		long key = 1;
 
 		try {
 
-			// LOG.info("Connection Schema: "+connection.isClosed());
 			if (connection != null) {
 				Statement statement = connection.createStatement();
 
@@ -103,8 +106,8 @@ public class ServerUtil {
 				}
 			}
 		} catch (SQLException e) {
-			LOG.error("MS SQL error", e);
-			throw e;
+			LOG.error("***ERROR*** {} Unable to get list of tables {}", e.toString(), QUERY_TABLES);
+			throw new RuntimeException(e);
 		}
 		return tables;
 	}
@@ -134,8 +137,8 @@ public class ServerUtil {
 			}
 
 		} catch (SQLException e) {
-			LOG.error("MS SQL error", e);
-			throw e;
+			LOG.error("***ERROR*** {} Unable to get row count for query {}", e.toString(), query);
+			throw new RuntimeException(e);
 		}
 		return count;
 
@@ -157,8 +160,8 @@ public class ServerUtil {
 		}
 
 		catch (SQLException e) {
-			LOG.error("MS SQL error", e);
-			throw e;
+			LOG.error("***ERROR*** {} Unable to get promary column connection {}", e.toString(), QUERY_PRIMARY_KEY);
+			throw new RuntimeException(e);
 		}
 		return primaryColumnName;
 	}
@@ -187,8 +190,9 @@ public class ServerUtil {
 
 			}
 		} catch (SQLException e) {
-			LOG.error("MS SQL error", e);
-			throw e;
+			LOG.error("***ERROR*** {} Unable to get column list for table {} , Query {}", e.toString(), tableName,
+					QUERY_COLUMNS);
+			throw new RuntimeException(e);
 		}
 
 		return columns;
@@ -208,13 +212,13 @@ public class ServerUtil {
 			try {
 				dataType = SqlDataType.valueOf(dataTypeString);
 			} catch (Exception e) {
-				LOG.error(String.format("Unrecognized data type %s", dataTypeString));
+				LOG.error(String.format(" ***ERROR*** Unrecognized data type %s", dataTypeString));
 				throw new SQLException(String.format("Unrecognized data type %s", dataTypeString));
 			}
 			if (ServerUtil.msSqlToBqTypeMap.containsKey(dataType)) {
 				fieldSchema.setType(ServerUtil.msSqlToBqTypeMap.get(dataType));
 			} else {
-				LOG.error(String.format("DataType %s not supported!", dataType));
+				LOG.error(String.format("***ERROR*** DataType %s not supported!", dataType));
 				throw new SQLException(String.format("DataType %s not supported!", dataType));
 			}
 			fieldSchemas.add(fieldSchema);
@@ -260,12 +264,12 @@ public class ServerUtil {
 
 	public static DLPProperties extractDLPConfig(String tableId, List<DLPProperties> dlpConfigList) {
 
-		DLPProperties prop= null;
-		if(dlpConfigList!=null) {
-		prop = dlpConfigList.stream().filter(config -> config.getTableName().equals(tableId)).findFirst()
-				.orElse(null);
+		DLPProperties prop = null;
+		if (dlpConfigList != null) {
+			prop = dlpConfigList.stream().filter(config -> config.getTableName().equals(tableId)).findFirst()
+					.orElse(null);
 		}
-		
+
 		return prop;
 	}
 
