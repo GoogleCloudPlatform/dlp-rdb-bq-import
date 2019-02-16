@@ -178,7 +178,7 @@ This pipeline executes in following steps:
 3. For each table split the select query based on offset count argument provided.  This uses split DoFn feature in dataflow.  
 4. Tokenize data if DLP config exist for the table. This is based on the template supplied part of DLP config Json file.  
 5. Use Dynamic destination feature in Big Query IO to create dataset and table schema as required. 
-6. Pipline uses Bigquery data load jobs (not streaming inserts) to load data.  
+6. Pipeline uses Bigquery data load jobs (not streaming inserts) to load data.  
  
 
 ### Connecting to SQL Server with Active Directory Authentication 

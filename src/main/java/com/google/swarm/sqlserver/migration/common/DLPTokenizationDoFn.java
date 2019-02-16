@@ -54,7 +54,8 @@ public class DLPTokenizationDoFn extends DoFn<KV<SqlTable, List<DbRow>>, KV<SqlT
 			this.dlpServiceClient = DlpServiceClient.create();
 		} catch (IOException e) {
 
-			e.printStackTrace();
+			LOG.error("***ERROR*** {} Unable to create DLP service ", e.toString());
+			throw new RuntimeException(e);
 		}
 
 	}
@@ -92,48 +93,53 @@ public class DLPTokenizationDoFn extends DoFn<KV<SqlTable, List<DbRow>>, KV<SqlT
 
 			});
 
-			Table table = Table.newBuilder().addAllHeaders(ServerUtil.getHeaders(tableId.getCloumnList()))
-					.addAllRows(dlpRows).build();
-			dlpRows.clear();
-			ContentItem tableItem = ContentItem.newBuilder().setTable(table).build();
-			DeidentifyContentRequest request;
-			DeidentifyContentResponse response;
-			if (prop.getInspTemplate() != null) {
-				request = DeidentifyContentRequest.newBuilder().setParent(ProjectName.of(this.projectId).toString())
-						.setDeidentifyTemplateName(prop.getDeidTemplate())
-						.setInspectTemplateName(prop.getInspTemplate()).setItem(tableItem).build();
-			} else {
-				request = DeidentifyContentRequest.newBuilder().setParent(ProjectName.of(this.projectId).toString())
-						.setDeidentifyTemplateName(prop.getDeidTemplate()).setItem(tableItem).build();
+			try {
+				Table table = Table.newBuilder().addAllHeaders(ServerUtil.getHeaders(tableId.getCloumnList()))
+						.addAllRows(dlpRows).build();
+				dlpRows.clear();
+				ContentItem tableItem = ContentItem.newBuilder().setTable(table).build();
+				DeidentifyContentRequest request;
+				DeidentifyContentResponse response;
+				if (prop.getInspTemplate() != null) {
+					request = DeidentifyContentRequest.newBuilder().setParent(ProjectName.of(this.projectId).toString())
+							.setDeidentifyTemplateName(prop.getDeidTemplate())
+							.setInspectTemplateName(prop.getInspTemplate()).setItem(tableItem).build();
+				} else {
+					request = DeidentifyContentRequest.newBuilder().setParent(ProjectName.of(this.projectId).toString())
+							.setDeidentifyTemplateName(prop.getDeidTemplate()).setItem(tableItem).build();
 
-			}
+				}
 
-			response = dlpServiceClient.deidentifyContent(request);
+				response = dlpServiceClient.deidentifyContent(request);
 
-			Table encryptedData = response.getItem().getTable();
+				Table encryptedData = response.getItem().getTable();
 
-			LOG.info("Request Size Successfully Tokenized: " + request.toByteString().size() + " bytes."
-					+ " Number of rows tokenized: " + response.getItem().getTable().getRowsCount());
+				LOG.info("Request Size Successfully Tokenized: " + request.toByteString().size() + " bytes."
+						+ " Number of rows tokenized: " + response.getItem().getTable().getRowsCount());
 
-			List<Table.Row> outputRows = encryptedData.getRowsList();
-			List<Value> values = new ArrayList<Value>();
-			List<String> encrytedValues = new ArrayList<String>();
+				List<Table.Row> outputRows = encryptedData.getRowsList();
+				List<Value> values = new ArrayList<Value>();
+				List<String> encrytedValues = new ArrayList<String>();
 
-			for (Table.Row outputRow : outputRows) {
+				for (Table.Row outputRow : outputRows) {
 
-				values = outputRow.getValuesList();
+					values = outputRow.getValuesList();
 
-				values.forEach(value -> {
+					values.forEach(value -> {
 
-					encrytedValues.add(value.getStringValue());
+						encrytedValues.add(value.getStringValue());
 
-				});
+					});
 
-				List<Object> objectList = new ArrayList<Object>(encrytedValues);
-				DbRow row = DbRow.create(objectList);
-				c.output(KV.of(tableId, row));
-				encrytedValues.clear();
+					List<Object> objectList = new ArrayList<Object>(encrytedValues);
+					DbRow row = DbRow.create(objectList);
+					c.output(KV.of(tableId, row));
+					encrytedValues.clear();
 
+				}
+			} catch (Exception e) {
+				LOG.error("***ERROR*** {} Unable to process DLP tokenization request", e.toString());
+				throw new RuntimeException(e);
 			}
 
 		} else {
