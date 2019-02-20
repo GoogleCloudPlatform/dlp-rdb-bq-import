@@ -64,7 +64,7 @@ public class BigQueryTableDestination extends DynamicDestinations<KV<SqlTable, T
 			tableSchema = ServerUtil.getBigQuerySchema(value.getValue().getCloumnList());
 			LOG.debug("***Table Schema {}", tableSchema.toString());
 
-		} catch (SQLException e) {
+		} catch (Exception e) {
 			LOG.error("***ERROR*** {} Unable to create dynamic schema", e.toString());
 			throw new RuntimeException(e);
 		}

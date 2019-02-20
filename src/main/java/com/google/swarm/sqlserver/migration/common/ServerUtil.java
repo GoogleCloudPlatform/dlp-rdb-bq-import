@@ -19,7 +19,6 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -60,7 +59,7 @@ public class ServerUtil {
 			.put(SqlDataType.TIMESTAMP, "STRING").put(SqlDataType.BINARY, "BYTES").put(SqlDataType.IMAGE, "BYTES")
 			.put(SqlDataType.VARBINARY, "BYTES").put(SqlDataType.UNIQUEIDENTIFIER, "STRING").build();
 
-	public static Connection getConnection(String connectionUrl) throws SQLException {
+	public static Connection getConnection(String connectionUrl) {
 
 		Connection connection = null;
 
@@ -105,7 +104,7 @@ public class ServerUtil {
 
 				}
 			}
-		} catch (SQLException e) {
+		} catch (Exception e) {
 			LOG.error("***ERROR*** {} Unable to get list of tables {}", e.toString(), QUERY_TABLES);
 			throw new RuntimeException(e);
 		}
@@ -113,7 +112,7 @@ public class ServerUtil {
 	}
 
 	public static List<SqlTable> getTablesList(Connection connection, String excludedTables,
-			List<DLPProperties> dlpConfigList) throws SQLException {
+			List<DLPProperties> dlpConfigList)  {
 		List<SqlTable> tables = ServerUtil.getTablesList(connection, dlpConfigList);
 		String[] excludedTableList = ServerUtil.parseExcludedTables(excludedTables);
 		tables.removeIf(table -> Arrays.asList(excludedTableList).contains(table.getName()));
@@ -121,7 +120,7 @@ public class ServerUtil {
 		return tables;
 	}
 
-	public static int getRowCount(Connection connection, String schemaName, String tableName) throws SQLException {
+	public static int getRowCount(Connection connection, String schemaName, String tableName){
 
 		int count = 0;
 
@@ -136,7 +135,7 @@ public class ServerUtil {
 				count = rs.getInt("NUMBER_OF_ROWS");
 			}
 
-		} catch (SQLException e) {
+		} catch (Exception e) {
 			LOG.error("***ERROR*** {} Unable to get row count for query {}", e.toString(), query);
 			throw new RuntimeException(e);
 		}
@@ -144,7 +143,7 @@ public class ServerUtil {
 
 	}
 
-	public static String getPrimaryColumn(Connection connection, String tableName) throws SQLException {
+	public static String getPrimaryColumn(Connection connection, String tableName) {
 
 		String primaryColumnName = null;
 
@@ -159,14 +158,14 @@ public class ServerUtil {
 
 		}
 
-		catch (SQLException e) {
+		catch (Exception e) {
 			LOG.error("***ERROR*** {} Unable to get promary column connection {}", e.toString(), QUERY_PRIMARY_KEY);
 			throw new RuntimeException(e);
 		}
 		return primaryColumnName;
 	}
 
-	public static List<SqlColumn> getColumnsList(Connection connection, String tableName) throws SQLException {
+	public static List<SqlColumn> getColumnsList(Connection connection, String tableName) {
 		List<SqlColumn> columns = new ArrayList<SqlColumn>();
 		String primaryKey = ServerUtil.getPrimaryColumn(connection, tableName);
 		try {
@@ -189,7 +188,7 @@ public class ServerUtil {
 				columns.add(column);
 
 			}
-		} catch (SQLException e) {
+		} catch (Exception e) {
 			LOG.error("***ERROR*** {} Unable to get column list for table {} , Query {}", e.toString(), tableName,
 					QUERY_COLUMNS);
 			throw new RuntimeException(e);
@@ -198,7 +197,7 @@ public class ServerUtil {
 		return columns;
 	}
 
-	public static TableSchema getBigQuerySchema(List<SqlColumn> tableColumns) throws SQLException {
+	public static TableSchema getBigQuerySchema(List<SqlColumn> tableColumns) {
 		if (tableColumns == null)
 			return null;
 
@@ -213,13 +212,12 @@ public class ServerUtil {
 				dataType = SqlDataType.valueOf(dataTypeString);
 			} catch (Exception e) {
 				LOG.error(String.format(" ***ERROR*** Unrecognized data type %s", dataTypeString));
-				throw new SQLException(String.format("Unrecognized data type %s", dataTypeString));
+				throw new RuntimeException(e);
 			}
 			if (ServerUtil.msSqlToBqTypeMap.containsKey(dataType)) {
 				fieldSchema.setType(ServerUtil.msSqlToBqTypeMap.get(dataType));
 			} else {
 				LOG.error(String.format("***ERROR*** DataType %s not supported!", dataType));
-				throw new SQLException(String.format("DataType %s not supported!", dataType));
 			}
 			fieldSchemas.add(fieldSchema);
 		}
