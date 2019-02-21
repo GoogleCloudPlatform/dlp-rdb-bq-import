@@ -27,20 +27,23 @@ import org.apache.beam.sdk.options.PipelineOptionsFactory;
 import org.apache.beam.sdk.options.ValueProvider;
 import org.apache.beam.sdk.transforms.Create;
 import org.apache.beam.sdk.transforms.DoFn;
-import org.apache.beam.sdk.transforms.MapElements;
+import org.apache.beam.sdk.transforms.Flatten;
 import org.apache.beam.sdk.transforms.ParDo;
 import org.apache.beam.sdk.transforms.SerializableFunction;
-import org.apache.beam.sdk.transforms.DoFn.ProcessContext;
 import org.apache.beam.sdk.transforms.windowing.AfterProcessingTime;
 import org.apache.beam.sdk.transforms.windowing.FixedWindows;
 import org.apache.beam.sdk.transforms.windowing.Window;
 import org.apache.beam.sdk.values.KV;
 import org.apache.beam.sdk.values.PCollection;
+import org.apache.beam.sdk.values.PCollectionList;
+import org.apache.beam.sdk.values.PCollectionTuple;
+import org.apache.beam.sdk.values.TupleTagList;
 import org.joda.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.api.services.bigquery.model.TableRow;
+import com.google.common.collect.ImmutableList;
 import com.google.swarm.sqlserver.migration.common.BigQueryTableDestination;
 import com.google.swarm.sqlserver.migration.common.BigQueryTableRowDoFn;
 import com.google.swarm.sqlserver.migration.common.CreateTableMapDoFn;
@@ -73,19 +76,24 @@ public class DBImportPipeline {
 		PCollection<ValueProvider<String>> jdbcString = p.apply("Check DB Properties",
 				Create.of(options.getJDBCSpec()));
 
-		PCollection<SqlTable> tableCollection = jdbcString.apply("Create Table Map",
+		PCollectionTuple tableCollection = jdbcString.apply("Create Table Map",
 				ParDo.of(new CreateTableMapDoFn(options.getExcludedTables(), options.getDLPConfigBucket(),
 						options.getDLPConfigObject(), options.getJDBCSpec(), options.getDataSet(),
-						options.as(GcpOptions.class).getProject())));
+						options.as(GcpOptions.class).getProject())).withOutputTags(CreateTableMapDoFn.successTag,
+								TupleTagList.of(CreateTableMapDoFn.deadLetterTag)));
 
-		PCollection<KV<SqlTable, TableRow>> dbRowKeyValue = tableCollection
-				.apply("Create DB Rows", ParDo.of(new TableToDbRowFn(options.getJDBCSpec(), options.getOffsetCount())))
+		PCollectionTuple dbRowKeyValue = tableCollection.get(CreateTableMapDoFn.successTag).apply("Create DB Rows",
+				ParDo.of(new TableToDbRowFn(options.getJDBCSpec(), options.getOffsetCount()))
+						.withOutputTags(TableToDbRowFn.successTag, TupleTagList.of(TableToDbRowFn.deadLetterTag)));
+
+		PCollection<KV<SqlTable, TableRow>> successRecords = dbRowKeyValue.get(TableToDbRowFn.successTag)
 				.apply("DLP Tokenization", ParDo.of(new DLPTokenizationDoFn(options.as(GcpOptions.class).getProject())))
 				.apply("Convert To BQ Row", ParDo.of(new BigQueryTableRowDoFn()))
-				.apply(Window.<KV<SqlTable, TableRow>>into(FixedWindows.of(Duration.standardSeconds(10)))
+				.apply(Window.<KV<SqlTable, TableRow>>into(FixedWindows.of(Duration.standardSeconds(30)))
 						.triggering(AfterProcessingTime.pastFirstElementInPane().plusDelayOf(Duration.ZERO))
 						.discardingFiredPanes().withAllowedLateness(Duration.ZERO));
-		WriteResult writeResult = dbRowKeyValue.apply("Write to BQ",
+
+		WriteResult writeResult = successRecords.apply("Write to BQ",
 				BigQueryIO.<KV<SqlTable, TableRow>>write().to(new BigQueryTableDestination(options.getDataSet()))
 						.withFormatFunction(new SerializableFunction<KV<SqlTable, TableRow>, TableRow>() {
 
@@ -96,18 +104,30 @@ public class DBImportPipeline {
 							}
 						}).withWriteDisposition(BigQueryIO.Write.WriteDisposition.WRITE_APPEND)
 						.withCreateDisposition(BigQueryIO.Write.CreateDisposition.CREATE_IF_NEEDED)
-						.withMethod(BigQueryIO.Write.Method.STREAMING_INSERTS)
+						.withMethod(BigQueryIO.Write.Method.STREAMING_INSERTS).withoutValidation()
 						.withFailedInsertRetryPolicy(InsertRetryPolicy.retryTransientErrors()));
 
-		writeResult.getFailedInserts().apply(ParDo.of(new DoFn<TableRow, TableRow>() {
+		writeResult.getFailedInserts().apply("LOG BQ Failed Inserts", ParDo.of(new DoFn<TableRow, TableRow>() {
 
 			@ProcessElement
 			public void processElement(ProcessContext c) {
-				LOG.error("***ERROR*** Failed Insert {}", c.element().toString());
+				LOG.error("***ERROR*** FAILED INSERT {}", c.element().toString());
 				c.output(c.element());
 			}
 
 		}));
+
+		PCollectionList
+				.of(ImmutableList.of(tableCollection.get(CreateTableMapDoFn.deadLetterTag),
+						dbRowKeyValue.get(TableToDbRowFn.deadLetterTag)))
+				.apply("Flatten", Flatten.pCollections())
+				.apply("Write Log Errors", ParDo.of(new DoFn<String, String>() {
+					@ProcessElement
+					public void processElement(ProcessContext c) {
+						LOG.error("***ERROR*** DEAD LETTER TAG {}", c.element().toString());
+						c.output(c.element());
+					}
+				}));
 
 		p.run();
 	}

@@ -14,8 +14,6 @@
 */
 package com.google.swarm.sqlserver.migration.common;
 
-import java.sql.SQLException;
-
 import org.apache.beam.sdk.io.gcp.bigquery.DynamicDestinations;
 import org.apache.beam.sdk.io.gcp.bigquery.TableDestination;
 import org.apache.beam.sdk.options.ValueProvider;
