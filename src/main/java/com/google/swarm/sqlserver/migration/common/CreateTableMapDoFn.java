@@ -14,7 +14,6 @@
 */
 package com.google.swarm.sqlserver.migration.common;
 
-import java.io.IOException;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -23,12 +22,17 @@ import java.util.List;
 import org.apache.beam.sdk.io.gcp.testing.BigqueryClient;
 import org.apache.beam.sdk.options.ValueProvider;
 import org.apache.beam.sdk.transforms.DoFn;
+import org.apache.beam.sdk.values.TupleTag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @SuppressWarnings("serial")
 public class CreateTableMapDoFn extends DoFn<ValueProvider<String>, SqlTable> {
 
+	public static TupleTag<SqlTable> successTag = new TupleTag<SqlTable>() {
+	};
+	public static TupleTag<String> deadLetterTag = new TupleTag<String>() {
+	};
 	private static final Logger LOG = LoggerFactory.getLogger(CreateTableMapDoFn.class);
 
 	private ValueProvider<String> excludedTables;
@@ -59,15 +63,20 @@ public class CreateTableMapDoFn extends DoFn<ValueProvider<String>, SqlTable> {
 
 			BigqueryClient bqClient = new BigqueryClient("DBImportPipeline");
 			bqClient.createNewDataset(projectId, this.dataset.get());
-			LOG.info("Dataset {} Created Successfully For Project {}", projectId, this.dataset.get());
+			LOG.info("Dataset {} Created/Checked Successfully For Project {}", this.dataset.get(), projectId);
 		}
 	}
 
 	@StartBundle
-	public void startBundle() throws SQLException {
+	public void startBundle() {
 
 		if (!this.jdbcSpec.get().equals(String.valueOf("TEST_HOST"))) {
-			this.connection = ServerUtil.getConnection(this.jdbcSpec.get());
+			try {
+				this.connection = ServerUtil.getConnection(this.jdbcSpec.get());
+			} catch (SQLException e) {
+				LOG.error("***ERROR** Unable to connect to Database {}", e.getMessage());
+				throw new RuntimeException();
+			}
 		}
 
 	}
@@ -80,35 +89,51 @@ public class CreateTableMapDoFn extends DoFn<ValueProvider<String>, SqlTable> {
 	}
 
 	@ProcessElement
-	public void processElement(ProcessContext c) throws SQLException {
+	public void processElement(ProcessContext c) {
 
 		if (this.jdbcSpec.get() != null) {
 
-			List<SqlTable> tables = new ArrayList<>();
-			if (!this.jdbcSpec.get().equals(String.valueOf("TEST_HOST"))) {
-				final List<DLPProperties> dlpConfigList = ServerUtil.parseDLPconfig(this.dlpConfigBucket,
-						this.dlpConfigObject);
+			try {
+				List<SqlTable> tables = new ArrayList<>();
+				if (!this.jdbcSpec.get().equals(String.valueOf("TEST_HOST"))) {
 
-				if (this.excludedTables.isAccessible() && this.excludedTables.get() != null) {
-					tables = ServerUtil.getTablesList(this.connection, this.excludedTables.get(), dlpConfigList);
+					final List<DLPProperties> dlpConfigList = ServerUtil.parseDLPconfig(this.dlpConfigBucket,
+							this.dlpConfigObject);
 
-				} else {
-					tables = ServerUtil.getTablesList(this.connection, dlpConfigList);
+					if (this.excludedTables.isAccessible() && this.excludedTables.get() != null) {
+						tables = ServerUtil.getTablesList(this.connection, this.excludedTables.get(), dlpConfigList);
+
+					} else {
+
+						tables = ServerUtil.getTablesList(this.connection, dlpConfigList);
+
+					}
 
 				}
 
 				for (SqlTable table : tables) {
-					LOG.debug("Extracting table schema: " + table.getFullName());
-					List<SqlColumn> tableColumns = ServerUtil.getColumnsList(connection, table.getName());
+					LOG.debug("Extracting table schema: {} ", table.getFullName());
+					List<SqlColumn> tableColumns = new ArrayList<>();
+
+					tableColumns = ServerUtil.getColumnsList(connection, table.getName());
+
 					table.setCloumnList(tableColumns);
-					c.output(table);
+					c.output(successTag, table);
 				}
 
-			} else {
-
-				c.output(TestUtil.getMockData());
 			}
 
+			catch (SQLException e) {
+				LOG.error("***ERROR** Unable to process table map request {}", e.getMessage());
+				c.output(deadLetterTag, e.toString());
+
+			}
 		}
+
+		else {
+
+			c.output(successTag, TestUtil.getMockData());
+		}
+
 	}
 }
