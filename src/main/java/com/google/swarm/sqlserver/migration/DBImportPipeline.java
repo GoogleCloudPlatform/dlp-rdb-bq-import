@@ -55,7 +55,7 @@ import com.google.swarm.sqlserver.migration.common.TableToDbRowFn;
 
 public class DBImportPipeline {
 	public static final Logger LOG = LoggerFactory.getLogger(DBImportPipeline.class);
-
+	
 	public static void main(String[] args) throws IOException, GeneralSecurityException {
 
 		DBImportPipelineOptions options = PipelineOptionsFactory.fromArgs(args).withValidation()
@@ -89,7 +89,7 @@ public class DBImportPipeline {
 		PCollection<KV<SqlTable, TableRow>> successRecords = dbRowKeyValue.get(TableToDbRowFn.successTag)
 				.apply("DLP Tokenization", ParDo.of(new DLPTokenizationDoFn(options.as(GcpOptions.class).getProject())))
 				.apply("Convert To BQ Row", ParDo.of(new BigQueryTableRowDoFn()))
-				.apply(Window.<KV<SqlTable, TableRow>>into(FixedWindows.of(Duration.standardSeconds(30)))
+				.apply("30 sec window",Window.<KV<SqlTable, TableRow>>into(FixedWindows.of(Duration.standardSeconds(30)))
 						.triggering(AfterProcessingTime.pastFirstElementInPane().plusDelayOf(Duration.ZERO))
 						.discardingFiredPanes().withAllowedLateness(Duration.ZERO));
 
