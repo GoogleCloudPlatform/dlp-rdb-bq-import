@@ -14,6 +14,7 @@
 */
 package com.google.swarm.sqlserver.migration.common;
 
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -58,7 +59,7 @@ public class CreateTableMapDoFn extends DoFn<ValueProvider<String>, SqlTable> {
 	}
 
 	@Setup
-	public void setup() {
+	public void setup() throws IOException, InterruptedException {
 		if (this.dataset.isAccessible() && this.dataset.get() != null) {
 
 			BigqueryClient bqClient = new BigqueryClient("DBImportPipeline");

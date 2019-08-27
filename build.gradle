@@ -16,7 +16,7 @@
 
 buildscript {
     ext {
-        dataflowBeamVersion = '2.9.0'
+        dataflowBeamVersion = '2.14.0'
     }
     repositories {
         mavenCentral()
@@ -39,9 +39,8 @@ apply plugin: 'eclipse'
 apply plugin: 'idea'
 apply plugin: "net.ltgt.apt"
 
-
 //mainClassName = System.getProperty("mainClass")
-mainClassName = 'com.google.swarm.sqlserver.migration.DBImportPipeline'
+mainClassName = 'com.google.swarm.dlp.reid.DLPReidentificationPipeline'
 group 'com.google.swarm'
 version '0.1.0'
 
