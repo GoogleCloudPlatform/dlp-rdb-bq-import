@@ -1,0 +1,4 @@
+{
+  "mainClass": "com.google.swarm.sqlserver.migration.BQReidentificationPipeline",
+  "classPath": "/template/dlp-migration-template/libs/*:/template/dlp-migration-template/classes"
+}

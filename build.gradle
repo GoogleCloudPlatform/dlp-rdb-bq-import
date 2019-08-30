@@ -16,7 +16,7 @@
 
 buildscript {
     ext {
-        dataflowBeamVersion = '2.9.0'
+        dataflowBeamVersion = '2.14.0'
     }
     repositories {
         mavenCentral()
@@ -28,6 +28,7 @@ buildscript {
     }
     dependencies {
         classpath "net.ltgt.gradle:gradle-apt-plugin:0.19"
+        classpath "gradle.plugin.com.google.cloud.tools:jib-gradle-plugin:1.4.0"
         
         
     }
@@ -38,10 +39,22 @@ apply plugin: 'application'
 apply plugin: 'eclipse'
 apply plugin: 'idea'
 apply plugin: "net.ltgt.apt"
+apply plugin: 'com.google.cloud.tools.jib'
 
 
-//mainClassName = System.getProperty("mainClass")
-mainClassName = 'com.google.swarm.sqlserver.migration.DBImportPipeline'
+mainClassName = System.getProperty("mainClass")
+//mainClassName = 'com.google.swarm.sqlserver.migration.BQReidentificationPipeline'
+jib {
+  from {
+    image = 'gcr.io/dataflow-templates-base/java8-template-launcher-base:latest'
+  }
+  container {
+    appRoot = '/template/dlp-migration-template'
+    entrypoint = 'INHERIT'
+	environment = [DATAFLOW_JAVA_COMMAND_SPEC:'/template/dlp-migration-template/resources/java_command_spec.json']
+	
+  }
+}
 group 'com.google.swarm'
 version '0.1.0'
 

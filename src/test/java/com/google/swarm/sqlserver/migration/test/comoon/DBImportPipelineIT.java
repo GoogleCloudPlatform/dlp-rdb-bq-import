@@ -16,6 +16,8 @@ package com.google.swarm.sqlserver.migration.test.comoon;
 
 import static org.junit.Assert.assertEquals;
 
+import java.io.IOException;
+
 import org.apache.beam.sdk.extensions.gcp.options.GcpOptions;
 import org.apache.beam.sdk.io.gcp.testing.BigqueryClient;
 import org.apache.beam.sdk.options.PipelineOptionsFactory;
@@ -50,7 +52,7 @@ public class DBImportPipelineIT {
 	public static Bucket bucket;
 
 	@Before
-	public void setupTestEnvironment() {
+	public void setupTestEnvironment() throws IOException, InterruptedException {
 		PipelineOptionsFactory.register(DBImportPipelineOptions.class);
 		options = TestPipeline.testingPipelineOptions().as(DBImportPipelineOptions.class);
 		projectId = TestPipeline.testingPipelineOptions().as(GcpOptions.class).getProject();
