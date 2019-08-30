@@ -355,3 +355,72 @@ In BQ:
 <img width="264" alt="drtwqwanhw3" src="https://user-images.githubusercontent.com/27572451/50616684-8d10c000-0eb7-11e9-8cea-4be834a04b9e.png">
 
 <img width="746" alt="gv5skqteuxx" src="https://user-images.githubusercontent.com/27572451/50616702-a3b71700-0eb7-11e9-9f90-8c92f93b3e83.png">
+
+
+
+### Re-Identification Pipeline from BQ to PubSub
+
+#### To Build and Create Docker Image
+```
+gradle build -DmainClass=com.google.swarm.sqlserver.migration.BQReidentificationPipeline --x test
+
+gradle jib --image=gcr.io/[PROJECT_ID]/dlp-reid-pipeline:v1 -DmainClass=com.google.swarm.sqlserver.migration.BQReidentificationPipeline
+
+```
+
+#### To Run
+
+###### Create a JSON config file by using necessary parameters. 
+```
+{  
+   "jobName":"dlp-reid-pipeline",
+   "parameters":{  
+   	"deidentifyTemplateName":"projects/[PROJECT_ID]/deidentifyTemplates/[ID]",
+    	"inspectTemplateName":"projects/[PROJECT_ID]/inspectTemplates/[ID]",
+      	"topic":"projects/[PROJECT_ID]/topics/[TOPIC_ID]",
+      	"query":"[query]",
+      	"columnMap":”[OPTIONAL_JSON_CLOUMN_MAP]"
+   }
+}
+```
+
+###### Update dynamic_template_dlp_reid.json
+
+```
+{
+  "docker_template_spec": {
+    "docker_image": "gcr.io/[PROJECT_ID]/dlp-reid-pipeline:v1"
+  }
+}
+
+```
+##### Execute runPipeline.sh
+
+```
+
+set -x
+
+echo "please to use glocud make sure you completed authentication"
+echo "gcloud config set project templates-user"
+echo "gcloud auth application-default login"
+
+PROJECT_ID=[PROJECT_ID]
+GCS_STAGING_LOCATION=gs://[BUCKET_NAME]/log
+API_ROOT_URL="https://dataflow.googleapis.com"
+TEMPLATES_LAUNCH_API="${API_ROOT_URL}/v1b3/projects/${PROJECT_ID}/templates:launch"
+JOB_NAME="dlp-reid-pipeline-`date +%Y%m%d-%H%M%S-%N`"
+PARAMETERS_CONFIG="@[CONFIG_JSON]"
+echo JOB_NAME=$JOB_NAME
+
+time curl -X POST -H "Content-Type: application/json" \
+ -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+ "${TEMPLATES_LAUNCH_API}"`
+ `"?validateOnly=false"`
+ `"&dynamicTemplate.gcsPath=gs://[BUCKET_SPEC]/dynamic_template_dlp_reid.json"`
+ `"&dynamicTemplate.stagingLocation=${GCS_STAGING_LOCATION}" \
+ -d "${PARAMETERS_CONFIG}"
+ 
+```
+
+
+

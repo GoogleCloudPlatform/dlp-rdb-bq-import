@@ -54,7 +54,7 @@ public class CreateTableMapDoFn extends DoFn<ValueProvider<String>, SqlTable> {
 	}
 
 	@Setup
-	public void setup() {
+	public void setup() throws IOException, InterruptedException {
 		if (this.dataset.isAccessible() && this.dataset.get() != null) {
 
 			BigqueryClient bqClient = new BigqueryClient("DBImportPipeline");
