@@ -30,6 +30,7 @@ import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.transforms.splittabledofn.OffsetRangeTracker;
 import org.apache.beam.sdk.transforms.splittabledofn.RestrictionTracker;
 import org.apache.beam.sdk.values.KV;
+import org.apache.beam.sdk.values.TupleTag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,7 +38,10 @@ import org.slf4j.LoggerFactory;
 public class TableToDbRowFn extends DoFn<SqlTable, KV<SqlTable, List<DbRow>>> {
 
 	private static final Logger LOG = LoggerFactory.getLogger(TableToDbRowFn.class);
-
+	public static TupleTag<KV<SqlTable, List<DbRow>>> successTag = new TupleTag<KV<SqlTable, List<DbRow>>>() {
+	};
+	public static TupleTag<String> deadLetterTag = new TupleTag<String>() {
+	};
 	private ValueProvider<String> connectionString;
 	private int batchSize;
 	private Connection connection;
@@ -64,45 +68,51 @@ public class TableToDbRowFn extends DoFn<SqlTable, KV<SqlTable, List<DbRow>>> {
 
 		for (long i = tracker.currentRestriction().getFrom(); tracker.tryClaim(i); ++i) {
 
-			LOG.info("Started Restriction From: {}, To: {} ", tracker.currentRestriction().getFrom(),
+			LOG.debug("Started Restriction From: {}, To: {} ", tracker.currentRestriction().getFrom(),
 					tracker.currentRestriction().getTo());
 			if (!this.connectionString.get().equals(String.valueOf("TEST_HOST"))) {
 				try {
 
 					String primaryKey = ServerUtil.findPrimaryKey(columnNames);
-					statement = connection.createStatement();
-					String query = String.format(
-							"SELECT * FROM %s.%s ORDER BY %s OFFSET %d * (%d - 1) " + "ROWS FETCH NEXT %d ROWS ONLY",
-							msSqlTable.getSchema(), msSqlTable.getName(), primaryKey, this.offsetCount.get(), i,
-							this.offsetCount.get());
-					LOG.debug("Executing query: " + query);
+					if (primaryKey != null) {
+						statement = connection.createStatement();
+						String query = String.format(
+								"SELECT * FROM %s.%s ORDER BY %s OFFSET %d * (%d - 1) "
+										+ "ROWS FETCH NEXT %d ROWS ONLY",
+								msSqlTable.getSchema(), msSqlTable.getName(), primaryKey, this.offsetCount.get(), i,
+								this.offsetCount.get());
+						LOG.debug("Executing query: " + query);
 
-					statement.executeQuery(query);
-					ResultSet rs = statement.executeQuery(query);
+						statement.executeQuery(query);
+						ResultSet rs = statement.executeQuery(query);
 
-					ResultSetMetaData meta = rs.getMetaData();
-					int columnCount = meta.getColumnCount();
-					while (rs.next()) {
-						List<Object> values = new ArrayList<Object>();
-						for (int colNumber = 1; colNumber <= columnCount; ++colNumber) {
-							SqlColumn column = columnNames.get(colNumber - 1);
-							String columnName = column.getName();
-							Object value = rs.getObject(columnName);
-							values.add(value);
+						ResultSetMetaData meta = rs.getMetaData();
+						int columnCount = meta.getColumnCount();
+						while (rs.next()) {
+							List<Object> values = new ArrayList<Object>();
+							for (int colNumber = 1; colNumber <= columnCount; ++colNumber) {
+								SqlColumn column = columnNames.get(colNumber - 1);
+								String columnName = column.getName();
+								Object value = rs.getObject(columnName);
+								values.add(value);
+							}
+
+							DbRow row = DbRow.create(values);
+							rows.add(row);
+
 						}
-
-						DbRow row = DbRow.create(values);
-						rows.add(row);
+						KV<SqlTable, List<DbRow>> kv = KV.of(msSqlTable, rows);
+						c.output(kv);
 
 					}
-					KV<SqlTable, List<DbRow>> kv = KV.of(msSqlTable, rows);
-					c.output(kv);
 
 				} catch (SQLException e) {
 
 					if (statement != null) {
 						statement.close();
 					}
+					LOG.error("***ERROR** Unable to query table {}", e.getMessage());
+					c.output(deadLetterTag, e.toString());
 
 				}
 
@@ -117,6 +127,8 @@ public class TableToDbRowFn extends DoFn<SqlTable, KV<SqlTable, List<DbRow>>> {
 				rows.add(row);
 				c.output(KV.of(msSqlTable, rows));
 			}
+			LOG.info("Successfully emit result for Restriction {} Table {}", i, msSqlTable.getFullName());
+
 		}
 
 	}
