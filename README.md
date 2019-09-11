@@ -361,6 +361,7 @@ In BQ:
 ### Re-Identification Pipeline from BQ to PubSub
 
 #### To Build and Create Docker Image
+
 ```
 gradle build -DmainClass=com.google.swarm.sqlserver.migration.BQReidentificationPipeline --x test
 
@@ -371,6 +372,7 @@ gradle jib --image=gcr.io/[PROJECT_ID]/dlp-reid-pipeline:v1 -DmainClass=com.goog
 #### To Run
 
 ###### Create a JSON config file by using necessary parameters. 
+
 ```
 {  
    "jobName":"dlp-reid-pipeline",
@@ -382,6 +384,7 @@ gradle jib --image=gcr.io/[PROJECT_ID]/dlp-reid-pipeline:v1 -DmainClass=com.goog
       	"columnMap":”[OPTIONAL_JSON_CLOUMN_MAP]"
    }
 }
+
 ```
 
 ###### Update dynamic_template_dlp_reid.json
@@ -397,7 +400,6 @@ gradle jib --image=gcr.io/[PROJECT_ID]/dlp-reid-pipeline:v1 -DmainClass=com.goog
 ##### Execute runPipeline.sh
 
 ```
-
 set -x
 
 echo "please to use glocud make sure you completed authentication"

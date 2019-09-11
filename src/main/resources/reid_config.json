@@ -1,10 +1,10 @@
 {  
    "jobName":"reied-pipeline",
    "parameters":{  
-      "deidentifyTemplateName":"projects/s3-dlp-experiment/deidentifyTemplates/sample-dataset-deid-v3",
-      "inspectTemplateName":"projects/s3-dlp-experiment/inspectTemplates/sample-dataset-inspect-v4",
-      "topic":"projects/s3-dlp-experiment/topics/events",
-      "query":"select ID,card_number,card_Holders_Name,Card_PIN from `s3-dlp-experiment.pii_dataset.CCRecords_*` where cast(credit_limit as int64)>100000 group by ID,card_number,card_Holders_Name,Card_PIN limit 1",
-      "columnMap":"{\"card_number\": \"Card Number\", \"card_Holders_Name\": \"Card Holder's Name\", \"Card_PIN\": \"Card PIN\"}"
+      "deidentifyTemplateName":"projects/[PROJECT_ID]/deidentifyTemplates/[ID]",
+      "inspectTemplateName":"projects/[PROJECT_ID]/inspectTemplates/[ID]",
+      "topic":"projects/[PROJECT_ID]/topics/[TOPIC_ID]",
+      "query":"[BQ_STANDARD_QUERY]",
+      "columnMap":"{JSON_CONFIG}"
    }
 }
