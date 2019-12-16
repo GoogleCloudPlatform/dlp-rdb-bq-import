@@ -21,33 +21,33 @@ import org.apache.beam.sdk.options.ValueProvider;
 
 public interface DBImportPipelineOptions extends PipelineOptions, DataflowPipelineOptions {
 
-	@Description("JDBC Spec")
-	ValueProvider<String> getJDBCSpec();
+  @Description("JDBC Spec")
+  ValueProvider<String> getJDBCSpec();
 
-	void setJDBCSpec(ValueProvider<String> value);
+  void setJDBCSpec(ValueProvider<String> value);
 
-	@Description("BQ Dataset")
-	ValueProvider<String> getDataSet();
+  @Description("BQ Dataset")
+  ValueProvider<String> getDataSet();
 
-	void setDataSet(ValueProvider<String> value);
+  void setDataSet(ValueProvider<String> value);
 
-	@Description("Exclude Tables")
-	ValueProvider<String> getExcludedTables();
+  @Description("Exclude Tables")
+  ValueProvider<String> getExcludedTables();
 
-	void setExcludedTables(ValueProvider<String> value);
+  void setExcludedTables(ValueProvider<String> value);
 
-	@Description("Table Offset Count")
-	ValueProvider<Integer> getOffsetCount();
+  @Description("Table Offset Count")
+  ValueProvider<Integer> getOffsetCount();
 
-	void setOffsetCount(ValueProvider<Integer> value);
+  void setOffsetCount(ValueProvider<Integer> value);
 
-	@Description("DLP Bucket Config")
-	ValueProvider<String> getDLPConfigBucket();
+  @Description("DLP Bucket Config")
+  ValueProvider<String> getDLPConfigBucket();
 
-	void setDLPConfigBucket(ValueProvider<String> value);
+  void setDLPConfigBucket(ValueProvider<String> value);
 
-	@Description("DLP Object Config")
-	ValueProvider<String> getDLPConfigObject();
+  @Description("DLP Object Config")
+  ValueProvider<String> getDLPConfigObject();
 
-	void setDLPConfigObject(ValueProvider<String> value);
+  void setDLPConfigObject(ValueProvider<String> value);
 }
