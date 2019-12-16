@@ -14,6 +14,8 @@
 */
 package com.google.swarm.sqlserver.migration.common;
 
+import com.google.api.services.bigquery.model.TableRow;
+import com.google.api.services.bigquery.model.TableSchema;
 import org.apache.beam.sdk.io.gcp.bigquery.DynamicDestinations;
 import org.apache.beam.sdk.io.gcp.bigquery.TableDestination;
 import org.apache.beam.sdk.options.ValueProvider;
@@ -22,52 +24,46 @@ import org.apache.beam.sdk.values.ValueInSingleWindow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.api.services.bigquery.model.TableRow;
-import com.google.api.services.bigquery.model.TableSchema;
+public class BigQueryTableDestination
+    extends DynamicDestinations<KV<SqlTable, TableRow>, KV<String, SqlTable>> {
 
-public class BigQueryTableDestination extends DynamicDestinations<KV<SqlTable, TableRow>, KV<String, SqlTable>> {
+  private static final long serialVersionUID = -2929752032929427146L;
 
-	private static final long serialVersionUID = -2929752032929427146L;
+  private static final Logger LOG = LoggerFactory.getLogger(BigQueryTableDestination.class);
 
-	private static final Logger LOG = LoggerFactory.getLogger(BigQueryTableDestination.class);
+  private ValueProvider<String> datasetName;
 
-	private ValueProvider<String> datasetName;
+  public BigQueryTableDestination(ValueProvider<String> datasetName) {
+    this.datasetName = datasetName;
+  }
 
-	public BigQueryTableDestination(ValueProvider<String> datasetName) {
-		this.datasetName = datasetName;
+  @Override
+  public KV<String, SqlTable> getDestination(ValueInSingleWindow<KV<SqlTable, TableRow>> element) {
+    KV<SqlTable, TableRow> kv = element.getValue();
+    SqlTable table = kv.getKey();
+    String key = datasetName.get() + "." + table.getFullName();
+    return KV.of(key, table);
+  }
 
-	}
+  @Override
+  public TableDestination getTable(KV<String, SqlTable> value) {
+    LOG.debug("Table Defination:{}", value.getKey());
+    return new TableDestination(value.getKey(), "DB Import Table");
+  }
 
-	@Override
-	public KV<String, SqlTable> getDestination(ValueInSingleWindow<KV<SqlTable, TableRow>> element) {
-		KV<SqlTable, TableRow> kv = element.getValue();
-		SqlTable table = kv.getKey();
-		String key = datasetName.get() + "." + table.getFullName();
-		return KV.of(key, table);
+  @Override
+  public TableSchema getSchema(KV<String, SqlTable> value) {
 
-	}
+    TableSchema tableSchema = null;
+    try {
 
-	@Override
-	public TableDestination getTable(KV<String, SqlTable> value) {
-		LOG.debug("Table Defination:{}", value.getKey());
-		return new TableDestination(value.getKey(), "DB Import Table");
-	}
+      tableSchema = ServerUtil.getBigQuerySchema(value.getValue().getCloumnList());
+      LOG.debug("***Table Schema {}", tableSchema.toString());
 
-	@Override
-	public TableSchema getSchema(KV<String, SqlTable> value) {
-
-		TableSchema tableSchema = null;
-		try {
-
-			tableSchema = ServerUtil.getBigQuerySchema(value.getValue().getCloumnList());
-			LOG.debug("***Table Schema {}", tableSchema.toString());
-
-		} catch (Exception e) {
-			LOG.error("***ERROR*** {} Unable to create dynamic schema", e.toString());
-			throw new RuntimeException(e);
-		}
-		return tableSchema;
-
-	}
-
+    } catch (Exception e) {
+      LOG.error("***ERROR*** {} Unable to create dynamic schema", e.toString());
+      throw new RuntimeException(e);
+    }
+    return tableSchema;
+  }
 }

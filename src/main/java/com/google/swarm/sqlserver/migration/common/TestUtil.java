@@ -19,47 +19,46 @@ import java.util.List;
 
 public class TestUtil {
 
-	public final static String DATASET = String.valueOf("TEST_DATA_SET");
-	public final static String JDBC_SPEC = String.valueOf("TEST_HOST");
-	public final static String EXPECTED_RESULT = String.valueOf("1");
-	public final static String TABLE_NAME = String.valueOf("TEST_TABLE");
-	public final static String TABLE_SCHEMA = String.valueOf("DBO");
-	public final static String TABLE_TYPE = String.valueOf("BASIC");
-	public final static int OFFSET = 1;
-	public final static String COLUMN1_NAME = String.valueOf("NAME");
-	public final static String COLUMN1_TYPE = String.valueOf("VARCHAR");
-	public final static String COLUMN2_NAME = String.valueOf("AGE");
-	public final static String COLUMN2_TYPE = String.valueOf("INT");
-	public static final String TEMP_BUCKET = String.valueOf("test_db_import_1");
-	public static String TEMP_LOCATION = null;
+  public static final String DATASET = String.valueOf("TEST_DATA_SET");
+  public static final String JDBC_SPEC = String.valueOf("TEST_HOST");
+  public static final String EXPECTED_RESULT = String.valueOf("1");
+  public static final String TABLE_NAME = String.valueOf("TEST_TABLE");
+  public static final String TABLE_SCHEMA = String.valueOf("DBO");
+  public static final String TABLE_TYPE = String.valueOf("BASIC");
+  public static final int OFFSET = 1;
+  public static final String COLUMN1_NAME = String.valueOf("NAME");
+  public static final String COLUMN1_TYPE = String.valueOf("VARCHAR");
+  public static final String COLUMN2_NAME = String.valueOf("AGE");
+  public static final String COLUMN2_TYPE = String.valueOf("INT");
+  public static final String TEMP_BUCKET = String.valueOf("test_db_import_1");
+  public static String TEMP_LOCATION = null;
 
-	public final static List<SqlColumn> testColumns = new ArrayList<>();
+  public static final List<SqlColumn> testColumns = new ArrayList<>();
 
-	public static SqlTable getMockData() {
+  public static SqlTable getMockData() {
 
-		SqlColumn column1 = new SqlColumn();
-		column1.setDataType(COLUMN1_TYPE);
-		column1.setDefaultValue(null);
-		column1.setName(COLUMN1_NAME);
-		column1.setNullable(true);
-		column1.setOrdinalPosition(1);
+    SqlColumn column1 = new SqlColumn();
+    column1.setDataType(COLUMN1_TYPE);
+    column1.setDefaultValue(null);
+    column1.setName(COLUMN1_NAME);
+    column1.setNullable(true);
+    column1.setOrdinalPosition(1);
 
-		SqlColumn column2 = new SqlColumn();
-		column2.setDataType(COLUMN2_TYPE);
-		column2.setDefaultValue(null);
-		column2.setName("COLUMN2_NAME");
-		column2.setNullable(true);
-		column2.setOrdinalPosition(2);
+    SqlColumn column2 = new SqlColumn();
+    column2.setDataType(COLUMN2_TYPE);
+    column2.setDefaultValue(null);
+    column2.setName("COLUMN2_NAME");
+    column2.setNullable(true);
+    column2.setOrdinalPosition(2);
 
-		testColumns.add(column1);
-		testColumns.add(column2);
+    testColumns.add(column1);
+    testColumns.add(column2);
 
-		SqlTable testTable = new SqlTable(1);
-		testTable.setName(TABLE_NAME);
-		testTable.setSchema(TABLE_SCHEMA);
-		testTable.setType(TABLE_TYPE);
-		testTable.setCloumnList(testColumns);
-		return testTable;
-
-	}
+    SqlTable testTable = new SqlTable(1);
+    testTable.setName(TABLE_NAME);
+    testTable.setSchema(TABLE_SCHEMA);
+    testTable.setType(TABLE_TYPE);
+    testTable.setCloumnList(testColumns);
+    return testTable;
+  }
 }

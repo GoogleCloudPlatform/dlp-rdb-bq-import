@@ -14,6 +14,14 @@
 */
 package com.google.swarm.sqlserver.migration.common;
 
+import com.google.api.services.bigquery.model.TableFieldSchema;
+import com.google.api.services.bigquery.model.TableSchema;
+import com.google.cloud.storage.BlobId;
+import com.google.cloud.storage.Storage;
+import com.google.cloud.storage.StorageOptions;
+import com.google.common.collect.ImmutableMap;
+import com.google.gson.Gson;
+import com.google.privacy.dlp.v2.FieldId;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -29,262 +37,278 @@ import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-
 import org.apache.beam.sdk.options.ValueProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.api.services.bigquery.model.TableFieldSchema;
-import com.google.api.services.bigquery.model.TableSchema;
-import com.google.cloud.storage.BlobId;
-import com.google.cloud.storage.Storage;
-import com.google.cloud.storage.StorageOptions;
-import com.google.common.collect.ImmutableMap;
-import com.google.gson.Gson;
-import com.google.privacy.dlp.v2.FieldId;
-
 public class ServerUtil {
 
-	public static final Logger LOG = LoggerFactory.getLogger(ServerUtil.class);
-	private static final String QUERY_TABLES = "SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE FROM INFORMATION_SCHEMA.TABLES";
-	private static final String QUERY_COLUMNS = "SELECT COLUMN_NAME, ORDINAL_POSITION, COLUMN_DEFAULT, IS_NULLABLE, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME=? ORDER BY ORDINAL_POSITION ASC";
-	private static final String QUERY_PRIMARY_KEY = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.CONSTRAINT_COLUMN_USAGE WHERE TABLE_NAME = ? AND constraint_name LIKE 'PK%'";
-	private static final String COLUMN_NAME_REGEXP = "^[A-Za-z_]+[A-Za-z_0-9]*$";
-	private static final Pattern COLUMN_NAME_REGEXP_PATTERN = Pattern.compile(COLUMN_NAME_REGEXP);
-	public static final Map<SqlDataType, String> msSqlToBqTypeMap = ImmutableMap.<SqlDataType, String>builder()
-			.put(SqlDataType.VARCHAR, "STRING").put(SqlDataType.NVARCHAR, "STRING").put(SqlDataType.CHAR, "STRING")
-			.put(SqlDataType.NCHAR, "STRING").put(SqlDataType.TEXT, "STRING").put(SqlDataType.NTEXT, "STRING")
-			.put(SqlDataType.BIGINT, "INTEGER").put(SqlDataType.INT, "INTEGER").put(SqlDataType.TINYINT, "INTEGER")
-			.put(SqlDataType.SMALLINT, "INTEGER").put(SqlDataType.NUMERIC, "FLOAT").put(SqlDataType.DECIMAL, "FLOAT")
-			.put(SqlDataType.MONEY, "FLOAT").put(SqlDataType.SMALLMONEY, "FLOAT").put(SqlDataType.FLOAT, "FLOAT")
-			.put(SqlDataType.REAL, "FLOAT").put(SqlDataType.BIT, "BOOLEAN").put(SqlDataType.DATE, "DATE")
-			.put(SqlDataType.TIME, "TIME").put(SqlDataType.DATETIME, "DATETIME").put(SqlDataType.DATETIME2, "DATETIME")
-			.put(SqlDataType.DATETIMEOFFSET, "TIMESTAMP").put(SqlDataType.SMALLDATETIME, "DATETIME")
-			.put(SqlDataType.TIMESTAMP, "STRING").put(SqlDataType.BINARY, "BYTES").put(SqlDataType.IMAGE, "BYTES")
-			.put(SqlDataType.VARBINARY, "BYTES").put(SqlDataType.UNIQUEIDENTIFIER, "STRING").build();
+  public static final Logger LOG = LoggerFactory.getLogger(ServerUtil.class);
+  private static final String QUERY_TABLES =
+      "SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE FROM INFORMATION_SCHEMA.TABLES";
+  private static final String QUERY_COLUMNS =
+      "SELECT COLUMN_NAME, ORDINAL_POSITION, COLUMN_DEFAULT, IS_NULLABLE, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME=? ORDER BY ORDINAL_POSITION ASC";
+  private static final String QUERY_PRIMARY_KEY =
+      "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.CONSTRAINT_COLUMN_USAGE WHERE TABLE_NAME = ? AND constraint_name LIKE 'PK%'";
+  private static final String COLUMN_NAME_REGEXP = "^[A-Za-z_]+[A-Za-z_0-9]*$";
+  private static final Pattern COLUMN_NAME_REGEXP_PATTERN = Pattern.compile(COLUMN_NAME_REGEXP);
+  public static final Map<SqlDataType, String> msSqlToBqTypeMap =
+      ImmutableMap.<SqlDataType, String>builder()
+          .put(SqlDataType.VARCHAR, "STRING")
+          .put(SqlDataType.NVARCHAR, "STRING")
+          .put(SqlDataType.CHAR, "STRING")
+          .put(SqlDataType.NCHAR, "STRING")
+          .put(SqlDataType.TEXT, "STRING")
+          .put(SqlDataType.NTEXT, "STRING")
+          .put(SqlDataType.BIGINT, "INTEGER")
+          .put(SqlDataType.INT, "INTEGER")
+          .put(SqlDataType.TINYINT, "INTEGER")
+          .put(SqlDataType.SMALLINT, "INTEGER")
+          .put(SqlDataType.NUMERIC, "FLOAT")
+          .put(SqlDataType.DECIMAL, "FLOAT")
+          .put(SqlDataType.MONEY, "FLOAT")
+          .put(SqlDataType.SMALLMONEY, "FLOAT")
+          .put(SqlDataType.FLOAT, "FLOAT")
+          .put(SqlDataType.REAL, "FLOAT")
+          .put(SqlDataType.BIT, "BOOLEAN")
+          .put(SqlDataType.DATE, "DATE")
+          .put(SqlDataType.TIME, "TIME")
+          .put(SqlDataType.DATETIME, "DATETIME")
+          .put(SqlDataType.DATETIME2, "DATETIME")
+          .put(SqlDataType.DATETIMEOFFSET, "TIMESTAMP")
+          .put(SqlDataType.SMALLDATETIME, "DATETIME")
+          .put(SqlDataType.TIMESTAMP, "STRING")
+          .put(SqlDataType.BINARY, "BYTES")
+          .put(SqlDataType.IMAGE, "BYTES")
+          .put(SqlDataType.VARBINARY, "BYTES")
+          .put(SqlDataType.UNIQUEIDENTIFIER, "STRING")
+          .build();
 
-	public static Connection getConnection(String connectionUrl) throws SQLException {
+  public static Connection getConnection(String connectionUrl) throws SQLException {
 
-		Connection connection = null;
+    Connection connection = null;
 
-		/*
-		 * Currently from any JDBC 4.0 drivers that are found in the class path are
-		 * automatically loaded. So, there is no need for Class.forName(). SQL Server
-		 * JDBC and JTDS Drivers are par of build.gradle at this time and included in
-		 * runtime. Please add required drivers if you need support for additional
-		 * databases.
-		 */
+    /*
+     * Currently from any JDBC 4.0 drivers that are found in the class path are
+     * automatically loaded. So, there is no need for Class.forName(). SQL Server
+     * JDBC and JTDS Drivers are par of build.gradle at this time and included in
+     * runtime. Please add required drivers if you need support for additional
+     * databases.
+     */
 
-		connection = DriverManager.getConnection(connectionUrl);
-		return connection;
+    connection = DriverManager.getConnection(connectionUrl);
+    return connection;
+  }
 
-	}
+  public static List<SqlTable> getTablesList(
+      Connection connection, List<DLPProperties> dlpConfigList) throws SQLException {
+    List<SqlTable> tables = new ArrayList<SqlTable>();
+    long key = 1;
 
-	public static List<SqlTable> getTablesList(Connection connection, List<DLPProperties> dlpConfigList)
-			throws SQLException {
-		List<SqlTable> tables = new ArrayList<SqlTable>();
-		long key = 1;
+    if (connection != null) {
+      Statement statement = connection.createStatement();
 
-		if (connection != null) {
-			Statement statement = connection.createStatement();
+      ResultSet rs = statement.executeQuery(QUERY_TABLES);
+      while (rs.next()) {
+        SqlTable table = new SqlTable(key);
+        table.setSchema(rs.getString("TABLE_SCHEMA"));
+        table.setName(rs.getString("TABLE_NAME"));
+        table.setDlpConfig(ServerUtil.extractDLPConfig(table.getName(), dlpConfigList));
+        table.setType(rs.getString("TABLE_TYPE"));
+        tables.add(table);
+        key = key + 1;
+      }
+    }
 
-			ResultSet rs = statement.executeQuery(QUERY_TABLES);
-			while (rs.next()) {
-				SqlTable table = new SqlTable(key);
-				table.setSchema(rs.getString("TABLE_SCHEMA"));
-				table.setName(rs.getString("TABLE_NAME"));
-				table.setDlpConfig(ServerUtil.extractDLPConfig(table.getName(), dlpConfigList));
-				table.setType(rs.getString("TABLE_TYPE"));
-				tables.add(table);
-				key = key + 1;
+    return tables;
+  }
 
-			}
-		}
+  public static List<SqlTable> getTablesList(
+      Connection connection, String excludedTables, List<DLPProperties> dlpConfigList)
+      throws SQLException {
+    List<SqlTable> tables = ServerUtil.getTablesList(connection, dlpConfigList);
+    String[] excludedTableList = ServerUtil.parseExcludedTables(excludedTables);
+    tables.removeIf(table -> Arrays.asList(excludedTableList).contains(table.getName()));
+    LOG.debug("Excluded Table size: {}", tables.size());
+    return tables;
+  }
 
-		return tables;
-	}
+  public static int getRowCount(Connection connection, String schemaName, String tableName) {
 
-	public static List<SqlTable> getTablesList(Connection connection, String excludedTables,
-			List<DLPProperties> dlpConfigList) throws SQLException {
-		List<SqlTable> tables = ServerUtil.getTablesList(connection, dlpConfigList);
-		String[] excludedTableList = ServerUtil.parseExcludedTables(excludedTables);
-		tables.removeIf(table -> Arrays.asList(excludedTableList).contains(table.getName()));
-		LOG.debug("Excluded Table size: {}", tables.size());
-		return tables;
-	}
+    int count = 0;
 
-	public static int getRowCount(Connection connection, String schemaName, String tableName) {
+    String query = String.format("SELECT COUNT(*) as NUMBER_OF_ROWS FROM %s", tableName);
+    LOG.debug("query: {}", query);
+    try {
 
-		int count = 0;
+      Statement statement = connection.createStatement();
+      ResultSet rs = statement.executeQuery(query);
+      while (rs.next()) {
 
-		String query = String.format("SELECT COUNT(*) as NUMBER_OF_ROWS FROM %s", tableName);
-		LOG.debug("query: {}", query);
-		try {
+        count = rs.getInt("NUMBER_OF_ROWS");
+      }
 
-			Statement statement = connection.createStatement();
-			ResultSet rs = statement.executeQuery(query);
-			while (rs.next()) {
+    } catch (Exception e) {
+      LOG.error("***ERROR*** {} Unable to get row count for query {}", e.toString(), query);
+    }
+    return count;
+  }
 
-				count = rs.getInt("NUMBER_OF_ROWS");
-			}
+  public static String getPrimaryColumn(Connection connection, String tableName) {
 
-		} catch (Exception e) {
-			LOG.error("***ERROR*** {} Unable to get row count for query {}", e.toString(), query);
-		}
-		return count;
+    String primaryColumnName = null;
 
-	}
+    try {
+      PreparedStatement statement = connection.prepareStatement(QUERY_PRIMARY_KEY);
+      statement.setString(1, tableName);
+      ResultSet rs = statement.executeQuery();
+      while (rs.next()) {
 
-	public static String getPrimaryColumn(Connection connection, String tableName) {
+        primaryColumnName = rs.getString("COLUMN_NAME");
+      }
 
-		String primaryColumnName = null;
+    } catch (Exception e) {
+      LOG.error(
+          "***ERROR*** {} Unable to get promary column connection {}",
+          e.toString(),
+          QUERY_PRIMARY_KEY);
+    }
+    return primaryColumnName;
+  }
 
-		try {
-			PreparedStatement statement = connection.prepareStatement(QUERY_PRIMARY_KEY);
-			statement.setString(1, tableName);
-			ResultSet rs = statement.executeQuery();
-			while (rs.next()) {
+  public static List<SqlColumn> getColumnsList(Connection connection, String tableName)
+      throws SQLException {
+    List<SqlColumn> columns = new ArrayList<SqlColumn>();
+    String primaryKey = ServerUtil.getPrimaryColumn(connection, tableName);
 
-				primaryColumnName = rs.getString("COLUMN_NAME");
-			}
+    PreparedStatement statement = connection.prepareStatement(QUERY_COLUMNS);
+    statement.setString(1, tableName);
 
-		}
+    ResultSet rs = statement.executeQuery();
+    while (rs.next()) {
+      SqlColumn column = new SqlColumn();
+      column.setOrdinalPosition(rs.getInt("ORDINAL_POSITION"));
+      column.setName(rs.getString("COLUMN_NAME"));
+      if (column.getName().equalsIgnoreCase(primaryKey)) {
+        column.setPrimaryKey(true);
+      } else {
+        column.setPrimaryKey(false);
+      }
+      column.setDefaultValue(rs.getString("COLUMN_DEFAULT"));
+      column.setNullable(rs.getBoolean("IS_NULLABLE"));
+      column.setDataType(rs.getString("DATA_TYPE"));
+      columns.add(column);
+    }
 
-		catch (Exception e) {
-			LOG.error("***ERROR*** {} Unable to get promary column connection {}", e.toString(), QUERY_PRIMARY_KEY);
-		}
-		return primaryColumnName;
-	}
+    return columns;
+  }
 
-	public static List<SqlColumn> getColumnsList(Connection connection, String tableName) throws SQLException {
-		List<SqlColumn> columns = new ArrayList<SqlColumn>();
-		String primaryKey = ServerUtil.getPrimaryColumn(connection, tableName);
+  public static TableSchema getBigQuerySchema(List<SqlColumn> tableColumns) {
+    if (tableColumns == null) return null;
 
-		PreparedStatement statement = connection.prepareStatement(QUERY_COLUMNS);
-		statement.setString(1, tableName);
+    TableSchema schema = new TableSchema();
+    List<TableFieldSchema> fieldSchemas = new ArrayList<TableFieldSchema>();
+    for (SqlColumn column : tableColumns) {
+      TableFieldSchema fieldSchema = new TableFieldSchema();
+      fieldSchema.setName(checkHeaderName(column.getName()));
+      String dataTypeString = column.getDataType().toUpperCase();
+      SqlDataType dataType;
+      try {
+        dataType = SqlDataType.valueOf(dataTypeString);
+      } catch (Exception e) {
+        LOG.error(String.format(" ***ERROR*** Unrecognized data type %s", dataTypeString));
+        throw new RuntimeException(e);
+      }
+      if (ServerUtil.msSqlToBqTypeMap.containsKey(dataType)) {
+        fieldSchema.setType(ServerUtil.msSqlToBqTypeMap.get(dataType));
+      } else {
+        LOG.error(String.format("***ERROR*** DataType %s not supported!", dataType));
+      }
+      fieldSchemas.add(fieldSchema);
+    }
+    schema.setFields(fieldSchemas);
 
-		ResultSet rs = statement.executeQuery();
-		while (rs.next()) {
-			SqlColumn column = new SqlColumn();
-			column.setOrdinalPosition(rs.getInt("ORDINAL_POSITION"));
-			column.setName(rs.getString("COLUMN_NAME"));
-			if (column.getName().equalsIgnoreCase(primaryKey)) {
-				column.setPrimaryKey(true);
-			} else {
-				column.setPrimaryKey(false);
-			}
-			column.setDefaultValue(rs.getString("COLUMN_DEFAULT"));
-			column.setNullable(rs.getBoolean("IS_NULLABLE"));
-			column.setDataType(rs.getString("DATA_TYPE"));
-			columns.add(column);
+    return schema;
+  }
 
-		}
+  public static String findPrimaryKey(List<SqlColumn> columnNames) {
 
-		return columns;
-	}
+    // setting up first column as PK if there is no PK set
+    SqlColumn columnName =
+        columnNames.stream()
+            .filter(column -> column.getPrimaryKey())
+            .findFirst()
+            .orElse(columnNames.get(0));
 
-	public static TableSchema getBigQuerySchema(List<SqlColumn> tableColumns) {
-		if (tableColumns == null)
-			return null;
+    LOG.debug("PRIMARY KEY {}", columnName.getName());
 
-		TableSchema schema = new TableSchema();
-		List<TableFieldSchema> fieldSchemas = new ArrayList<TableFieldSchema>();
-		for (SqlColumn column : tableColumns) {
-			TableFieldSchema fieldSchema = new TableFieldSchema();
-			fieldSchema.setName(checkHeaderName(column.getName()));
-			String dataTypeString = column.getDataType().toUpperCase();
-			SqlDataType dataType;
-			try {
-				dataType = SqlDataType.valueOf(dataTypeString);
-			} catch (Exception e) {
-				LOG.error(String.format(" ***ERROR*** Unrecognized data type %s", dataTypeString));
-				throw new RuntimeException(e);
-			}
-			if (ServerUtil.msSqlToBqTypeMap.containsKey(dataType)) {
-				fieldSchema.setType(ServerUtil.msSqlToBqTypeMap.get(dataType));
-			} else {
-				LOG.error(String.format("***ERROR*** DataType %s not supported!", dataType));
-			}
-			fieldSchemas.add(fieldSchema);
-		}
-		schema.setFields(fieldSchemas);
+    return columnName.getName();
+  }
 
-		return schema;
-	}
+  public static String[] parseExcludedTables(String excludedTables) {
+    return excludedTables.split("-");
+  }
 
-	public static String findPrimaryKey(List<SqlColumn> columnNames) {
+  public static List<DLPProperties> parseDLPconfig(
+      ValueProvider<String> bucket, ValueProvider<String> blob) {
 
-		// setting up first column as PK if there is no PK set
-		SqlColumn columnName = columnNames.stream().filter(column -> column.getPrimaryKey()).findFirst()
-				.orElse(columnNames.get(0));
+    DLPProperties[] configMaps = null;
+    if ((!bucket.isAccessible() || !blob.isAccessible())) {
+      return null;
+    }
+    if (bucket.get() != null && blob.get() != null) {
 
-		LOG.debug("PRIMARY KEY {}", columnName.getName());
+      Storage storage = StorageOptions.getDefaultInstance().getService();
+      BlobId blobId = BlobId.of(bucket.get(), blob.get());
+      byte[] bytes = storage.readAllBytes(blobId);
+      configMaps =
+          new Gson().fromJson(new String(bytes, StandardCharsets.UTF_8), DLPProperties[].class);
+    }
 
-		return columnName.getName();
+    List<DLPProperties> dlpConfigs =
+        Arrays.asList(Optional.ofNullable(configMaps).orElse(new DLPProperties[0]));
 
-	}
+    return dlpConfigs;
+  }
 
-	public static String[] parseExcludedTables(String excludedTables) {
-		return excludedTables.split("-");
+  public static DLPProperties extractDLPConfig(String tableId, List<DLPProperties> dlpConfigList) {
 
-	}
+    DLPProperties prop = null;
+    if (dlpConfigList != null) {
+      prop =
+          dlpConfigList.stream()
+              .filter(config -> config.getTableName().equals(tableId))
+              .findFirst()
+              .orElse(null);
+    }
 
-	public static List<DLPProperties> parseDLPconfig(ValueProvider<String> bucket, ValueProvider<String> blob) {
+    return prop;
+  }
 
-		DLPProperties[] configMaps = null;
-		if ((!bucket.isAccessible() || !blob.isAccessible())) {
-			return null;
-		}
-		if (bucket.get() != null && blob.get() != null) {
+  public static List<FieldId> getHeaders(List<SqlColumn> tableHeaders) {
 
-			Storage storage = StorageOptions.getDefaultInstance().getService();
-			BlobId blobId = BlobId.of(bucket.get(), blob.get());
-			byte[] bytes = storage.readAllBytes(blobId);
-			configMaps = new Gson().fromJson(new String(bytes, StandardCharsets.UTF_8), DLPProperties[].class);
+    String[] columnNames = new String[tableHeaders.size()];
 
-		}
+    for (int i = 0; i < columnNames.length; i++) {
+      columnNames[i] = tableHeaders.get(i).getName();
+    }
+    List<FieldId> headers =
+        Arrays.stream(columnNames)
+            .map(header -> FieldId.newBuilder().setName(header).build())
+            .collect(Collectors.toList());
+    LOG.debug("HEADERS SIZE {}", headers.size());
+    return headers;
+  }
 
-		List<DLPProperties> dlpConfigs = Arrays.asList(Optional.ofNullable(configMaps).orElse(new DLPProperties[0]));
-
-		return dlpConfigs;
-
-	}
-
-	public static DLPProperties extractDLPConfig(String tableId, List<DLPProperties> dlpConfigList) {
-
-		DLPProperties prop = null;
-		if (dlpConfigList != null) {
-			prop = dlpConfigList.stream().filter(config -> config.getTableName().equals(tableId)).findFirst()
-					.orElse(null);
-		}
-
-		return prop;
-	}
-
-	public static List<FieldId> getHeaders(List<SqlColumn> tableHeaders) {
-
-		String[] columnNames = new String[tableHeaders.size()];
-
-		for (int i = 0; i < columnNames.length; i++) {
-			columnNames[i] = tableHeaders.get(i).getName();
-
-		}
-		List<FieldId> headers = Arrays.stream(columnNames).map(header -> FieldId.newBuilder().setName(header).build())
-				.collect(Collectors.toList());
-		LOG.debug("HEADERS SIZE {}", headers.size());
-		return headers;
-	}
-
-	public static String checkHeaderName(String name) {
-		// some checks to make sure BQ column names don't fail e.g. special characters
-		String checkedHeader = name.replaceAll("\\s", "_");
-		checkedHeader = checkedHeader.replaceAll("'", "");
-		checkedHeader = checkedHeader.replaceAll("/", "");
-		Matcher match = COLUMN_NAME_REGEXP_PATTERN.matcher(checkedHeader);
-		if (!match.matches()) {
-			throw new IllegalArgumentException("Column name can't be matched to a valid format " + name);
-		}
-		return checkedHeader;
-	}
-
+  public static String checkHeaderName(String name) {
+    // some checks to make sure BQ column names don't fail e.g. special characters
+    String checkedHeader = name.replaceAll("\\s", "_");
+    checkedHeader = checkedHeader.replaceAll("'", "");
+    checkedHeader = checkedHeader.replaceAll("/", "");
+    Matcher match = COLUMN_NAME_REGEXP_PATTERN.matcher(checkedHeader);
+    if (!match.matches()) {
+      throw new IllegalArgumentException("Column name can't be matched to a valid format " + name);
+    }
+    return checkedHeader;
+  }
 }

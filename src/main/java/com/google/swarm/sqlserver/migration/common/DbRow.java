@@ -14,29 +14,26 @@
 */
 package com.google.swarm.sqlserver.migration.common;
 
+import com.google.auto.value.AutoValue;
 import java.io.Serializable;
 import java.util.List;
-
 import org.apache.beam.sdk.coders.DefaultCoder;
 import org.apache.beam.sdk.coders.SerializableCoder;
-
-import com.google.auto.value.AutoValue;
 
 @AutoValue
 @DefaultCoder(SerializableCoder.class)
 public abstract class DbRow implements Serializable {
 
-	private static final long serialVersionUID = -4891579648750861340L;
+  private static final long serialVersionUID = -4891579648750861340L;
 
-	public abstract List<Object> fields();
+  public abstract List<Object> fields();
 
-	public static DbRow create(List<Object> fields) {
-		return new AutoValue_DbRow(fields);
-	}
+  public static DbRow create(List<Object> fields) {
+    return new AutoValue_DbRow(fields);
+  }
 
-	@Override
-	public String toString() {
-		return "DbRow [fields()=" + fields() + "]";
-	}
-
+  @Override
+  public String toString() {
+    return "DbRow [fields()=" + fields() + "]";
+  }
 }

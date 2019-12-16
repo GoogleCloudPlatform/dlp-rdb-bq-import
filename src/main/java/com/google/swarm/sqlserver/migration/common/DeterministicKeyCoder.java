@@ -19,47 +19,41 @@ import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
-
 import org.apache.beam.sdk.coders.AtomicCoder;
 import org.apache.beam.sdk.coders.CoderException;
 
 @SuppressWarnings("serial")
 public class DeterministicKeyCoder extends AtomicCoder<SqlTable> {
 
-	public static DeterministicKeyCoder of() {
-		return INSTANCE;
-	}
+  public static DeterministicKeyCoder of() {
+    return INSTANCE;
+  }
 
-	private static final DeterministicKeyCoder INSTANCE = new DeterministicKeyCoder();
+  private static final DeterministicKeyCoder INSTANCE = new DeterministicKeyCoder();
 
-	private DeterministicKeyCoder() {
-	}
+  private DeterministicKeyCoder() {}
 
-	@Override
-	public void encode(SqlTable value, OutputStream outStream) throws CoderException, IOException {
+  @Override
+  public void encode(SqlTable value, OutputStream outStream) throws CoderException, IOException {
 
-		ObjectOutputStream data = new ObjectOutputStream(outStream);
+    ObjectOutputStream data = new ObjectOutputStream(outStream);
 
-		data.writeObject(value);
+    data.writeObject(value);
+  }
 
-	}
+  @Override
+  public SqlTable decode(InputStream inStream) throws CoderException, IOException {
 
-	@Override
-	public SqlTable decode(InputStream inStream) throws CoderException, IOException {
+    ObjectInputStream data = new ObjectInputStream(inStream);
+    SqlTable value = null;
+    try {
+      value = (SqlTable) data.readObject();
+    } catch (ClassNotFoundException e) {
+      e.printStackTrace();
+    }
+    return value;
+  }
 
-		ObjectInputStream data = new ObjectInputStream(inStream);
-		SqlTable value = null;
-		try {
-			value = (SqlTable) data.readObject();
-		} catch (ClassNotFoundException e) {
-			e.printStackTrace();
-		}
-		return value;
-
-	}
-
-	@Override
-	public void verifyDeterministic() {
-	}
-
+  @Override
+  public void verifyDeterministic() {}
 }

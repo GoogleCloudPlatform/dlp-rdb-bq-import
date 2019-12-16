@@ -17,30 +17,54 @@ package com.google.swarm.sqlserver.migration.common;
 import java.util.HashMap;
 
 public enum SqlDataType {
-	VARCHAR(0), NVARCHAR(1), CHAR(2), NCHAR(3), TEXT(4), NTEXT(5), BIGINT(6), INT(7), TINYINT(8), SMALLINT(9),
-	NUMERIC(10), DECIMAL(11), MONEY(12), SMALLMONEY(13), FLOAT(14), REAL(15), BIT(16), DATE(17), TIME(18), DATETIME(19),
-	DATETIME2(20), DATETIMEOFFSET(21), SMALLDATETIME(22), BINARY(23), IMAGE(24), VARBINARY(25), UNIQUEIDENTIFIER(26),
-	TIMESTAMP(27);
+  VARCHAR(0),
+  NVARCHAR(1),
+  CHAR(2),
+  NCHAR(3),
+  TEXT(4),
+  NTEXT(5),
+  BIGINT(6),
+  INT(7),
+  TINYINT(8),
+  SMALLINT(9),
+  NUMERIC(10),
+  DECIMAL(11),
+  MONEY(12),
+  SMALLMONEY(13),
+  FLOAT(14),
+  REAL(15),
+  BIT(16),
+  DATE(17),
+  TIME(18),
+  DATETIME(19),
+  DATETIME2(20),
+  DATETIMEOFFSET(21),
+  SMALLDATETIME(22),
+  BINARY(23),
+  IMAGE(24),
+  VARBINARY(25),
+  UNIQUEIDENTIFIER(26),
+  TIMESTAMP(27);
 
-	private int codeValue;
+  private int codeValue;
 
-	private static HashMap<Integer, SqlDataType> codeValueMap = new HashMap<Integer, SqlDataType>();
+  private static HashMap<Integer, SqlDataType> codeValueMap = new HashMap<Integer, SqlDataType>();
 
-	private SqlDataType(int codeValue) {
-		this.codeValue = codeValue;
-	}
+  private SqlDataType(int codeValue) {
+    this.codeValue = codeValue;
+  }
 
-	static {
-		for (SqlDataType type : SqlDataType.values()) {
-			codeValueMap.put(type.codeValue, type);
-		}
-	}
+  static {
+    for (SqlDataType type : SqlDataType.values()) {
+      codeValueMap.put(type.codeValue, type);
+    }
+  }
 
-	public static SqlDataType getInstanceFromCodeValue(int codeValue) {
-		return codeValueMap.get(codeValue);
-	}
+  public static SqlDataType getInstanceFromCodeValue(int codeValue) {
+    return codeValueMap.get(codeValue);
+  }
 
-	public int getCodeValue() {
-		return codeValue;
-	}
+  public int getCodeValue() {
+    return codeValue;
+  }
 }
