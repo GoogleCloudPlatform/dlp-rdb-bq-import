@@ -34,8 +34,6 @@ public interface BQReIdentificationPipelineOptions extends DataflowPipelineOptio
   void setTopic(String value);
 
   @Description("Mapping of a BQ columns and Original Column names")
-  @Default.String(
-      "{\"card_number\": \"Card Number\", \"Card_Holders_Name\": \"Card Holder's Name\"}")
   String getColumnMap();
 
   void setColumnMap(String value);

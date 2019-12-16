@@ -38,7 +38,7 @@ API_KEY=$7
 
 # publicly hosted image
 DYNAMIC_TEMPLATE_BUCKET_SPEC=gs://dynamic-template/dynamic_template_dlp_reid.json
-COLUMN_MAP='"{\"card_number\": \"Card Number\", \"card_Holders_Name\": \"Card Holder''s Name\"}"'
+COLUMN_MAP='"{\"card_number\": \"Card Number\", \"card_holders_name\": \"Card Holder'\''s Name\"}"'
 JOB_NAME="dlp-df-reid-pipeline-`date +%Y%m%d-%H%M%S-%N`"
 echo $JOB_NAME
 GCS_STAGING_LOCATION="gs://$GCS_TEMP_LOCATION/temp"
@@ -46,11 +46,8 @@ TEMP_LOCATION='$GCS_STAGING_LOCATION'
 PARAMETERS_CONFIG='{  
    "jobName":"'$JOB_NAME'",
    "parameters":{  
-      "streaming":"true",
-	  "enableStreamingEngine":"true",
-	  "autoscalingAlgorithm":"NONE",
       "workerMachineType": "n1-standard-8",
-      "numWorkers":"9",
+      "numWorkers":"1",
       "maxNumWorkers":"9",
 	  "inspectTemplateName":"'$INSPECT_TEMPLATE_NAME'",
 	  "deidentifyTemplateName":"'$DEID_TEMPLATE_NAME'",
